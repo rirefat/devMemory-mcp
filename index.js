@@ -3,6 +3,7 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio'
 import * as z from 'zod/v4'
 
 import { createProjectFiles } from './project-files.js'
+import { createGitTools } from './git-tools.js'
 
 // --------------------------------------------------
 // 1. Configure the project root
@@ -11,9 +12,10 @@ import { createProjectFiles } from './project-files.js'
 const rootInput = process.env.DEVMEMORY_PROJECT_ROOT || process.cwd()
 
 const projectFiles = await createProjectFiles(rootInput)
+const gitTools = createGitTools(projectFiles.projectRoot)
 
 // --------------------------------------------------
-// 2. Shared MCP response helpers
+// 2. Response helpers
 // --------------------------------------------------
 
 function textResponse (data) {
@@ -28,14 +30,17 @@ function textResponse (data) {
 }
 
 function errorResponse (error) {
-  console.error('DevMemory tool error:', error.message || error)
+  const message =
+    error instanceof Error ? error.message : 'The operation failed.'
+
+  console.error('DevMemory tool error:', message)
 
   return {
     isError: true,
     content: [
       {
         type: 'text',
-        text: error.message || 'The operation failed.'
+        text: message
       }
     ]
   }
@@ -51,7 +56,7 @@ async function safelyRun (operation) {
 }
 
 // --------------------------------------------------
-// 3. Create MCP server and register tools
+// 3. Create and register MCP tools
 // --------------------------------------------------
 
 function createServer () {
@@ -60,9 +65,9 @@ function createServer () {
     version: '1.0.0'
   })
 
-  // -----------------------------------------------
-  // Tool 1: Get project overview
-  // -----------------------------------------------
+  // ----------------------------------------------
+  // CODEBASE TOOL 1: Project overview
+  // ----------------------------------------------
 
   server.registerTool(
     'get_project_overview',
@@ -75,9 +80,9 @@ function createServer () {
     async () => safelyRun(() => projectFiles.getProjectOverview())
   )
 
-  // -----------------------------------------------
-  // Tool 2: List project files
-  // -----------------------------------------------
+  // ----------------------------------------------
+  // CODEBASE TOOL 2: List project files
+  // ----------------------------------------------
 
   server.registerTool(
     'list_project_files',
@@ -99,9 +104,9 @@ function createServer () {
       )
   )
 
-  // -----------------------------------------------
-  // Tool 3: Search codebase
-  // -----------------------------------------------
+  // ----------------------------------------------
+  // CODEBASE TOOL 3: Search codebase
+  // ----------------------------------------------
 
   server.registerTool(
     'search_codebase',
@@ -125,9 +130,9 @@ function createServer () {
       )
   )
 
-  // -----------------------------------------------
-  // Tool 4: Read a project file
-  // -----------------------------------------------
+  // ----------------------------------------------
+  // CODEBASE TOOL 4: Read project file
+  // ----------------------------------------------
 
   server.registerTool(
     'read_project_file',
@@ -151,11 +156,77 @@ function createServer () {
       )
   )
 
+  // ----------------------------------------------
+  // GIT TOOL 1: Git status
+  // ----------------------------------------------
+
+  server.registerTool(
+    'get_git_status',
+    {
+      title: 'Get Git Status',
+      description:
+        'Inspect the current Git branch and working-tree changes without modifying files.',
+      inputSchema: {}
+    },
+    async () => safelyRun(() => gitTools.getGitStatus())
+  )
+
+  // ----------------------------------------------
+  // GIT TOOL 2: Git commit history
+  // ----------------------------------------------
+
+  server.registerTool(
+    'get_git_log',
+    {
+      title: 'Get Git Log',
+      description:
+        'Read recent Git commits, including hashes, authors, dates, and messages.',
+      inputSchema: {
+        limit: z.number().int().min(1).max(50).optional()
+      }
+    },
+    async ({ limit }) =>
+      safelyRun(() =>
+        gitTools.getGitLog({
+          limit: limit ?? 10
+        })
+      )
+  )
+
+  // ----------------------------------------------
+  // GIT TOOL 3: Git diff summary
+  // ----------------------------------------------
+
+  server.registerTool(
+    'get_git_diff_summary',
+    {
+      title: 'Get Git Diff Summary',
+      description:
+        'Summarize staged and unstaged tracked-file changes without modifying the repository.',
+      inputSchema: {}
+    },
+    async () => safelyRun(() => gitTools.getGitDiffSummary())
+  )
+
+  // ----------------------------------------------
+  // GIT TOOL 4: List Git branches
+  // ----------------------------------------------
+
+  server.registerTool(
+    'list_git_branches',
+    {
+      title: 'List Git Branches',
+      description: 'List local Git branches and identify the current branch.',
+      inputSchema: {}
+    },
+    async () => safelyRun(() => gitTools.listGitBranches())
+  )
+
   return server
 }
 
 // --------------------------------------------------
-// 4. Start the MCP server
+// 4. Start the MCP server over stdio
 // --------------------------------------------------
 
 console.error('DevMemory MCP starting.')
