@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "devmemory": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/Users/rafiulrefat/Projects/devmemory-mcp/index.js"],
+      "env": {
+        "DEVMEMORY_PROJECT_ROOT": "/Users/rafiulrefat/Projects/devmemory-mcp"
+      }
+    }
+  }
+}
